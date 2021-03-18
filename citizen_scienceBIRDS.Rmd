@@ -1,0 +1,21 @@
+---
+title: "Biodiversity Information Review & Decision Support with Citizen Science data"
+subtitle: "BIO8068 Data visualisation in Ecology"
+output:
+  word_document:
+    reference_docx: word_template.docx
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rgbif)
+library(rinat)
+library(NBN4R)
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+```
+
+# What is Biodiversity Information Review & Decision Support (BIRDS)?
