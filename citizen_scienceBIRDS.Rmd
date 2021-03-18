@@ -16,6 +16,171 @@ library(NBN4R)
 library(ggplot2)
 library(dplyr)
 library(lubridate)
+library(BIRDS)
+library(sp)
+library(sf)
 ```
 
 # What is Biodiversity Information Review & Decision Support (BIRDS)?
+You have already seen how to download citizen science data from a variety of databases, and identified some of the problems that may occur. But how do you know whether the citizen science data is "fit-for-use" for subsequent visualisation and modelling? `BIRDS` is an R package that will help you identify potential under- or over-reporting of species in particular areas, detect anomalous records etc. as well as help you in your decision-making when using citizen science data.
+
+This practical aims to provide an overview of some of the basic functionality of BIRDS, and some typical workflows, using data from the NBN Atlas dataset. Note that despite its name, BIRDS can be used on any taxonomic group! The concepts behind BIRDS were originally published in three papers over the last 20 years, although the package itself is very new:
+
+* Ruete A. (2015) Displaying bias in sampling effort of data accessed from biodiversity databases using ignorance maps. Biodiversity Data Journal <https://doi.org/10.3897/BDJ.3.e5361>
+* Szabo J.K. _et al_ (2010) Regional avian species declines estimated from volunteer-collected long-term data using List Length Analysis. Ecological Applications <https://doi.org/10.1890/09-0877.1>
+* Tefler M.G. _et al_ (2002) A general method for measuring relative change in range size from biological atlas data. Biological Conservation <https://doi.org/10.1016/S0006-3207(02)00050-2>
+
+# Getting started with BIRDS
+Begin by installing and loading the BIRDS package in the usual way. Note that it will in
+
+```{r, eval=FALSE}
+library(BIRDS)
+library(NBN4R)
+library(sp)
+library(sf)
+library(lubridate)
+
+gb_ll_sf <- readRDS("gb_simple.RDS")
+scot_ll_sf <- gb_ll_sf[2,]
+scot_ll_sp <- as_Spatial(scot_ll_sf) # Expects polygon in sp format
+
+
+# get_coords <- function(sp_single){
+#   unlist(lapply(sp_single@polygons, function(ss){
+#     lapply(ss@Polygons, function(ss_i){
+#       return(ss_i@coords)
+#     })
+#   }), recursive = FALSE)
+# }
+# sp_convert <- function(x, group = TRUE){
+#   if(!is.list(x)){
+#     x <- list(x)
+#   }
+#   coords <- lapply(x, get_coords)
+#   return(sp_convert(coords, group))
+# }
+# 
+# scot_wkt <- writeWKT(scot_ll_sp)
+
+
+nbn_config(caching="off")
+drosera_nbn <- ALA4R::occurrences(taxon="Drosera anglica", download_reason_id=4,
+                                  verbose=TRUE,
+#                                  wkt=scot_wkt,
+                                  email="your.email@newcastle.ac.uk")
+# If the download fails, use GBIF, or this file from Canvas
+# drosera_nbn <- readRDS("drosera_nbn.RDS")
+```
+
+```{r}
+PBD <- drosera_nbn$data
+PBD <- PBD[!is.na(PBD$longitudeWGS84) | !is.na(PBD$latitudeWGS84) ,]
+PBD <- PBD[PBD$startDate != "" ,]
+PBD <- PBD[PBD$locality != "" ,]
+PBD <- PBD[PBD$recorder != "" ,]
+PBD <- PBD[PBD$startDateYear >= 1970 ,]
+OB <- organizeBirds(PBD, sppCol = "scientificName", simplifySppName = TRUE,
+                    idCols = c("locality", "recorder"),
+                    xyCols = c("longitudeWGS84", "latitudeWGS84"),
+                    timeCols = c("startDateYear", "startDateMonth", "startDateDay"))
+```
+
+```{r}
+SB <- summariseBirds(OB, grid=scot_grid)
+```
+
+```{r}
+# Look at some summarised variables:
+# Number of observations
+EBnObs <- exportBirds(SB, dimension = "temporal", timeRes = "yearly", 
+                      variable = "nObs", method = "sum")
+# Number of visits
+EBnVis <- exportBirds(SB, dimension = "temporal", timeRes = "yearly", 
+                      variable = "nVis", method = "sum")
+# The ratio of number of observations over number of visits
+relObs<-EBnObs/EBnVis
+```
+
+```{r}
+# Average species list length (SLL) per year (a double-average, i.e. the mean 
+# over cell values for the median SLL from all visits per year and cell) 
+EBavgSll <- colMeans(SB$spatioTemporal[,,"Yearly","avgSll"], na.rm = TRUE)
+```
+
+```{r}
+oldpar <- par(no.readonly =TRUE)
+par(mar=c(4,4,1,6), las=1)
+plot(time(EBnObs), EBnObs, type = "l", lwd = 3, xlab = "Year", ylab = "Number", 
+     ylim=c(0, max(EBnObs)), xaxp=c(2000, 2018, 18))
+lines(time(EBnObs), EBnVis, lwd=3, lty=2)
+lines(time(EBnObs), relObs * max(EBnObs) / max(relObs), lwd=3, lty=1, col="#78D2EB")
+lines(time(EBnObs), EBavgSll * max(EBnObs) / max(EBavgSll), lwd=3, lty=1, col="#FFB3B5")
+axis(4, at = seq(0, max(EBnObs), length.out = 5), 
+     labels = round(seq(0,max(relObs), length.out = 5), 1), 
+     lwd = 2, col = "#78D2EB", col.ticks = "#78D2EB")
+axis(4, at = seq(0, max(EBnObs), length.out = 5) , 
+     labels = round(seq(0,max(EBavgSll), length.out = 5), 1), 
+     lwd = 2, col = "#FFB3B5", col.ticks = "#FFB3B5", line = 3)
+legend("topleft", legend=c("n.observations","n.visits"), 
+       lty = c(1,2), lwd = 3, bty = "n")
+legend("bottomright", legend=c("n.observations / n.visits", "avg. SLL per cell"),
+       lty = 1, lwd = 3, col = c("#78D2EB", "#FFB3B5"), bty = "n")
+par(oldpar)
+```
+
+
+```{r}
+wNonEmpty<-unname( which( unlist(lapply(SB$overlaid, nrow)) != 0) )
+EB <- exportBirds(SB, "Spatial", "Month", "nYears", "sum")
+# because the dimension is "spatial", the result is a 'SpatialPolygonDataFrame'
+
+palBW <- leaflet::colorNumeric(c("white", "navyblue"), 
+                               c(0, max(EB@data, na.rm = TRUE)), 
+                               na.color = "transparent")
+oldpar <- par(no.readonly =TRUE)
+par(mfrow=c(1,3), mar=c(1,1,1,1))
+plot(SB$spatial[wNonEmpty,], col="grey", border = NA)
+plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
+mtext("Visited cells", 3, line=-1)
+
+plot(EB, col=palBW(EB@data$Jul), border = NA)
+plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
+mtext("Number of years for which \nJuly was sampled", 3, line=-2)
+
+plot(EB, col=palBW(EB@data$Dec), border = NA)
+plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
+mtext("Number of years for which \nDecember was sampled", 3, line=-2)
+legend("bottomleft", 
+       legend=seq(0, max(EB@data, na.rm = TRUE), length.out = 5),
+       col = palBW(seq(0, max(EB@data, na.rm = TRUE), length.out = 5)),
+       title = "Number of years", pch = 15, bty="n")
+par(oldpar)
+```
+
+
+```{r}
+oldpar <- par(no.readonly =TRUE)
+par(mfrow=c(1,2), mar=c(1,1,1,1))
+palBW <- leaflet::colorNumeric(c("white", "navyblue"), 
+                               c(0, max(SB$spatial@data$nVis, na.rm = TRUE)), 
+                               na.color = "transparent")
+seqNVis<-round(seq(0, max(SB$spatial@data$nVis, na.rm = TRUE), length.out = 5))
+plot(SB$spatial, col=palBW(SB$spatial@data$nVis), border = NA)
+plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
+legend("bottomleft", legend=seqNVis, col = palBW(seqNVis),
+      title = "Number of \nobservations", pch = 15, bty="n")
+
+ign<-exposeIgnorance(SB$spatial@data$nVis, h = 5)
+palBWR <- leaflet::colorNumeric(c("navyblue", "white","red"), c(0, 1), 
+                                na.color = "transparent")
+plot(scot_ll_sp, col="grey90", border = "grey90", lwd=1)
+#> Warning in wkt(obj): CRS object has no comment
+plot(SB$spatial, col=palBWR(ign), border = NA, add=TRUE)
+plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
+legend("bottomleft", legend=c(seq(0, 1, length.out = 5), "NA"),
+      col = c(palBWR(seq(0, 1, length.out = 5)), "grey90"),
+      title = "Ignorance \nnVis, \nO0.5=5", pch = 15, bty="n")
+par(oldpar)
+```
+
+
