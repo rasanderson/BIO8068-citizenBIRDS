@@ -31,7 +31,7 @@ This practical aims to provide an overview of some of the basic functionality of
 * Tefler M.G. _et al_ (2002) A general method for measuring relative change in range size from biological atlas data. Biological Conservation <https://doi.org/10.1016/S0006-3207(02)00050-2>
 
 # Getting started with BIRDS
-Begin by installing and loading the BIRDS package in the usual way. Note that it will in
+Begin by installing and loading the BIRDS package in the usual way with `install.packages("BIRDS")`. Note that it will auto-install various other packages at the same time. Please load the BIRDS library, as well as several other useful ones, such as `NBN4R` to get the data, the `sp` and `sf` packages for handling spatial information, and the `lubridate` package for handling dates and times.
 
 ```{r, eval=FALSE}
 library(BIRDS)
@@ -39,56 +39,113 @@ library(NBN4R)
 library(sp)
 library(sf)
 library(lubridate)
+```
 
-gb_ll_sf <- readRDS("gb_simple.RDS")
-scot_ll_sf <- gb_ll_sf[2,]
-scot_ll_sp <- as_Spatial(scot_ll_sf) # Expects polygon in sp format
+# Sundews _Drosera_ in Scotland
+As our example to demonstrate how to use BIRDS, we will look at Citizen Science data on fly-catches or sundews, in Scotland. Sundews belong to the genus _Drosera_ and there are several different species in the UK. They tend to occur in upland bogs, where the soil is poor in nitrogen and other key nutrients, and the plants have evolved sticky hairs on their leaves with which to catch insects, and in thus increase their supply of nutrients.
 
+```{r, eval=FALSE}
 nbn_config(caching="off")
-drosera_nbn <- ALA4R::occurrences(taxon="Drosera", download_reason_id=4,
+drosera_nbn <- ALA4R::occurrences(taxon="Drosera",
+                                  download_reason_id=4,
                                   verbose=TRUE,
                                   email="your.email@newcastle.ac.uk")
-# If the download fails, use GBIF, or this file from Canvas
+
+# If the download fails, use GBIF, or this drosera_nbn.RDS file from Canvas
 # drosera_nbn <- readRDS("drosera_nbn.RDS")
 ```
 
 ```{r, echo=FALSE}
-library(BIRDS)
-library(NBN4R)
-library(sp)
-library(sf)
-library(lubridate)
-
-gb_ll_sf <- readRDS("gb_simple.RDS")
-scot_ll_sf <- gb_ll_sf[2,]
-scot_ll_sp <- as_Spatial(scot_ll_sf) # Expects polygon in sp format
-
-nbn_config(caching="off")
+# nbn_config(caching="off")
 # drosera_nbn <- ALA4R::occurrences(taxon="Drosera anglica", download_reason_id=4,
 #                                  verbose=TRUE,
 #                                  email="your.email@newcastle.ac.uk")
-# If the download fails, use GBIF, or this file from Canvas
 drosera_nbn <- readRDS("drosera_nbn.RDS")
 ```
 
+Remember that the downloaded data is in the form of an R "list", with two sections in it, `$data` and a `$meta` section, with additional information about sources. For example type `View(drosera_nbn$meta$citation)` to see information about the recording schemes. You can check the scientific names with:
+
+```{r}
+unique(drosera_nbn$data$scientificName)
+```
+
+and you can see that there are several species, some hybrids, and some records only recorded to genus-level. To make subsequent analyses easier, we'll put the `drosera_nbn$data` dataframe into a dataframe of its own, so that you no longer have to use multiple `$` symbols to address a list structure. We'll call it `PBD` to indicate "primary biodiversity data" which is the syntax used by BIRDS. We'll then clean up the data, to:
+
+* remove records without longitude or latitude information
+* remove records without information on the recording date
+* remove records without information about the locality (used by BIRDS)
+* remove records without information on the recorder (again, this is used by BIRDS)
+* keep records identified to the `rank` of species, and not merely genus
+* keep records from 1970 onwards. We  Some records go back to the 19th century, and they are likely to skew our analyses.
+
+In the lines of code below, remember that
+
+* `!` represents "not"
+* `|` represents "or"
+* `!=` represents "not equal"
+* `==` represents "equals"
+* `>=` represents "greater than or equals"
+
+Note that before the closing square bracket there is a comma `,]` to indicate that all columns in the dataframe should be retained:
 
 ```{r}
 PBD <- drosera_nbn$data
 PBD <- PBD[!is.na(PBD$longitudeWGS84) | !is.na(PBD$latitudeWGS84) ,]
 PBD <- PBD[PBD$startDate != "" ,]
-PBD <- PBD[PBD$locality != "" ,]
-PBD <- PBD[PBD$recorder != "" ,]
+PBD <- PBD[PBD$locality  != "" ,]
+PBD <- PBD[PBD$recorder  != "" ,]
+PBD <- PBD[PBD$rank      == "species" ,] # This can be done via organizeBirds
 PBD <- PBD[PBD$startDateYear >= 1970 ,]
-OB <- organizeBirds(PBD, sppCol = "scientificName", simplifySppName = TRUE,
-                    idCols = c("locality", "recorder"),
-                    xyCols = c("longitudeWGS84", "latitudeWGS84"),
-                    timeCols = c("startDateYear", "startDateMonth", "startDateDay"))
 ```
 
+# Field visits and the OrganizedBirds class
+A central concept in BIRDS is what is known as an `OrganizedBirds` class. This makes it easier to assess visits by the same or different observers over time to different sites or localities. Hence, when we cleaned the data, we had to ensure that localities and recorder information was available. A “visit” define the sampling unit as a sampling event by a unique observer (or group of observers), at a unique unit of space and time (commonly a day). Visits can help us to summarize the amount of effort expended in the field. During a visit, the observer commonly samples (i.e. observes and records) species by similar methods. The sampling effort can vary among visits, with the amount of effort expended being greater when spending more time, and reporting more of the observed species. The same number of observations (records of species) at a unique unit of time and space could be made by either few observers reporting many species (greater effort by each observer) or many observers reporting few species (small effort by each observer). Using visits as sampling units allows separation of sampling effort into the effort that can be expressed through the number of visits by different observers and the effort per visit (e.g. species list length, or when available the time spent during a visit). Hence, the quality (completeness) of the data can be judged by using information for each visit and information from a collection of visits.
+
+To create our `OB` object simply use the `organizeBirds()` function. By default quite a lot of information is printed to screen as it processes the data, but don't worry about that. 
+
+```{r, results="hide"}
+OB <- organizeBirds(PBD,
+                    sppCol = "scientificName",
+                    simplifySppName = TRUE,  # Removes authors and years etc.
+                    idCols = c("locality", "recorder"),
+                    xyCols = c("longitudeWGS84", "latitudeWGS84"),
+                    timeCols = "startDate")
+```
+
+We can then create a 25km grid for Scotland on which to explore the data; this should be the maximum sized area that a person might explore in a day (this differs for different taxonomic groups). By default it is set at 10 km, but as this will slow down calculations for a large area like Scotland, I'll slightly increase it to 25km which is still not unrealistic. 
+
 ```{r}
+gb_ll_sf <- readRDS("gb_simple.RDS")
+scot_ll_sf <- gb_ll_sf[2,]  # Scotland is coded number 2 in the GB map used
+scot_ll_sp <- as_Spatial(scot_ll_sf) # Expects polygon in sp rather than sf format
+
 scot_grid <- makeGrid(scot_ll_sp, 25)
+plot(scot_grid)
+```
+
+You can see that it actually creates a series of **hexagonal** grids packed together, which is more convenient when analysing the species occurence data. You can then summarise the `OB` object against this grids to show how the number of visits varies. Records in England and Wales are omitted:
+
+```{r}
 SB <- summariseBirds(OB, grid=scot_grid)
 ```
+
+Once you have obtained this summarised data object `SB` you can then interrogate it, for example using `exposeIgnorance()` to highlight any areas of particular concern (there are none in this case). A particularly useful function is to look at changes across years, months, and space, all in one plot for a given species:
+
+```{r}
+all_species <- listSpecies(SB)
+all_species
+focal_species <- all_species[1] # Let's pick Drosera anglica
+focalSpReport(SB, focalSp=focal_species)
+```
+
+The map shows the hexagons that were visited, shaded according to whether the _Drosera anglica_ was detected. Note that not all hexagons are present (compare with earlier map), in that a small number were not visited at all. You can also obtain useful information about how long, and over how many months, each species was observed in tabular form:
+
+```{r, eval=FALSE}
+drosera_summary <- speciesSummary(SB)
+View(SB)
+```
+
+You can export information from your `SB` object to plot changes over time. For example, a useful static is the number of observations relative to the number of visits, which we will sum for each year:
 
 ```{r}
 # Look at some summarised variables:
@@ -99,14 +156,24 @@ EBnObs <- exportBirds(SB, dimension = "temporal", timeRes = "yearly",
 EBnVis <- exportBirds(SB, dimension = "temporal", timeRes = "yearly", 
                       variable = "nVis", method = "sum")
 # The ratio of number of observations over number of visits
-relObs<-EBnObs/EBnVis
+relObs <- EBnObs/EBnVis
 ```
+
 
 ```{r}
 # Average species list length (SLL) per year (a double-average, i.e. the mean 
 # over cell values for the median SLL from all visits per year and cell) 
 EBavgSll <- colMeans(SB$spatioTemporal[,,"Yearly","avgSll"], na.rm = TRUE)
 ```
+
+Now let's create some simple plots to view patterns over time:
+
+```{r}
+# plot(EBnObs) # Default for time-series object
+autoplot(EBnObs) +   # ggplot2-compatible
+  xlab("Year")
+```
+
 
 ```{r}
 oldpar <- par(no.readonly =TRUE)

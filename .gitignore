@@ -37,3 +37,7 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+citizen_scienceBIRDS.docx
+citizen_scienceBIRDS.html
+citizen_scienceBIRDS.pdf
