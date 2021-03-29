@@ -41,7 +41,24 @@ library(sf)
 library(lubridate)
 ```
 
-# Sundews _Drosera_ in Scotland
+# Four key concepts
+## 1. Field visit
+A central concept used by the `BIRDS` package is the “visit” – defining the sampling unit as a sampling event by a unique observer (or group of observers), at a unique unit of space and time (commonly a day). Visits can help us to summarize the amount of effort expended in the field. During a visit, the observer commonly samples (i.e. observes and records) species by similar methods. The sampling effort can vary among visits, with the amount of effort expended being greater when spending more time, and reporting more of the observed species. The same number of observations (records of species) at a unique unit of time and space could be made by either few observers reporting many species (greater effort by each observer) or many observers reporting few species (small effort by each observer). Using visits as sampling units allows separation of sampling effort into the effort that can be expressed through the number of visits by different observers and the effort per visit (e.g. species list length, or when available the time spent during a visit). Hence, the quality (completeness) of the data can be judged by using information for each visit and information from a collection of visits.
+
+## 2. Spatial grid and spillover
+Defined by a unique observer (or group of observers), at a unique unit of space and time visits can be identified by a unique combination of variables: observer id, location, time. Often location is a named unit of space that has been visited during the same sampling event. For example a botanist visiting and reporting species for a meadow, or a bird watcher visiting and reporting species for a lake.
+
+Sometimes locations can be more accurate positions for individuals of species that have been observed and reported during the same field visit. The botanist may have visited the meadow but reported species from a number of different sampling points in that meadow. Or the bird watcher reported species for different parts of the lake. In that case there is no common spatial identifier for the visit.
+
+If there is no common spatial identifier to define the visit extent, and the observer id is not enough to constrain observations spatially (e.g. group of observers from organisation where observer id = organisation name), then visits can be created when overlaying the observation data with the spatial grid. A visit is then defined as all the observations falling into the same grid cell. It is important to keep in mind to choose a grid with a cell size that corresponds to (or at least is not smaller than) the average spatial extent known (or assumed) to be typical for field visits for the reference species group (see below). This process can be repeated with a set of grids with different offset to explore the sensitivity of the results to the size of the grid cells.
+
+## 3. Reference species group
+One assumption is that the multiple species that you investigate could all be sampled by the same method. So a "reference species group" might be Coccindellidae (Ladybirds), which are all sampled in a similar way by members of the public when they do their surveying. Bumblebees, primarily belonging to the genus _Bombus_, could be another reference species group. It would not be appropriate to pick something like Lepidoptera as a reference species group as this is too broad: this insect Order includes both butterflies and moths. Many of the latter are only active at night, and are sampled using very different techniques. In this example we will look at one genus of plants, which have similar habitat requirements.
+
+## 4. Species list length (SLL)
+The SLL per visit (i.e. the number of species observed and recorded per visit) is a well known proxy for the time spent in the field and willingness to report all species seen of a reference taxonomic group, Szabo et al. 2010). The BIRDS package therefore uses SLL as a proxy for sampling effort.
+
+# Example: sundews _Drosera_ in Scotland
 As our example to demonstrate how to use BIRDS, we will look at Citizen Science data on fly-catches or sundews, in Scotland. Sundews belong to the genus _Drosera_ and there are several different species in the UK. They tend to occur in upland bogs, where the soil is poor in nitrogen and other key nutrients, and the plants have evolved sticky hairs on their leaves with which to catch insects, and in thus increase their supply of nutrients.
 
 ```{r, eval=FALSE}
@@ -123,7 +140,7 @@ scot_grid <- makeGrid(scot_ll_sp, 25)
 plot(scot_grid)
 ```
 
-You can see that it actually creates a series of **hexagonal** grids packed together, which is more convenient when analysing the species occurence data. You can then summarise the `OB` object against this grids to show how the number of visits varies. Records in England and Wales are omitted:
+You can see that it actually creates by default a series of **hexagonal** grids packed together, which gives an attractive visualisation when analysing the species occurence data. If you want square grids, then give the option `hexGrid = FALSE`. You can then summarise the `OB` object against this grids to show how the number of visits varies. Records in England and Wales are omitted:
 
 ```{r}
 SB <- summariseBirds(OB, grid=scot_grid)
@@ -200,16 +217,76 @@ autoplot(EBavgSll) +
 This is quite a small dataset (deliberately, to speed up data processing for you), so keep in mind that there are only 6 species of _Drosera_ in the dataset, of which only two a widespread. Therefore, don't be suprised that the average species list length is low. What matters are changes over time, and you can see that this is generally increasing, which is good. Ignore the sudden drop-off in 2019-20, suggesting the most recent datasets have not been fully uploaded.
 
 ## Mapping frequency with which areas were visited
-
+Next, let's create some maps across Scotland to show which grid cells were visited, and the number of years in which samples were taken in July compared to December. You can see from the earlier plots that (as might be expected) most samples were in the summer. How is this pattern showing spatially?
 
 ```{r}
+# Identify gridcells which have no records. A bit complicated a the SB
+# object is an R "list" structure.
 wNonEmpty<-unname( which( unlist(lapply(SB$overlaid, nrow)) != 0) )
-EB <- exportBirds(SB, "Spatial", "Month", "nYears", "sum")
-# because the dimension is "spatial", the result is a 'SpatialPolygonDataFrame'
+plot(SB$spatial[wNonEmpty,], col="grey", border = NA)
+plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
+```
 
-palBW <- leaflet::colorNumeric(c("white", "navyblue"), 
-                               c(0, max(EB@data, na.rm = TRUE)), 
-                               na.color = "transparent")
+You can see that most of Scotland has been surveyed according to the dataset. Now let us extract the information on a monthly basis for the total number of years (sum) of visits to each cell.
+
+```{r}
+# Export single variables from SummarisedBirds object. Here we want the total 
+# number of years, nYears, for each cell, with information broken down by
+# month.
+EB <- exportBirds(SB,
+                  dimension = "Spatial",
+                  timeRes = "Month",
+                  variable = "nYears", # nObs, nVis, nSpp, nDays, AvgSll options
+                  method = "sum")      # sum, medain, mean options
+```
+
+
+```{r, eval=FALSE}
+# Create a nice looking colour pallete from white to navy blue
+palBW <- leaflet::colorNumeric("Blues",
+                               domain = c(0, max(EB@data, na.rm = TRUE)) ) 
+
+# Set plot window to 1 row and 2 columns
+par(mfrow=c(1,2))
+
+# Plot July data
+plot(EB, col=palBW(EB@data$Jul), border = NA)
+plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
+mtext("Number of years for which \nJuly was sampled", 3, line=-2)
+
+# Plot December data
+plot(EB, col=palBW(EB@data$Dec), border = NA)
+plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
+mtext("Number of years for which \nDecember was sampled", 3, line=-2)
+
+# Add legend showing number of years
+legend("bottomleft", 
+       legend=seq(0, max(EB@data, na.rm = TRUE), length.out = 5),
+       col = palBW(seq(0, max(EB@data, na.rm = TRUE), length.out = 5)),
+       title = "Number of years", pch = 15, bty="n")
+
+# Reset plot window
+par(mfrow=c(1,1))
+```
+
+```{r, echo=FALSE}
+# This code to produce 3 maps side-by-side
+# Identify gridcells which have no records. A bit complicated a the SB
+# object is an R "list" structure.
+wNonEmpty<-unname( which( unlist(lapply(SB$overlaid, nrow)) != 0) )
+
+# Export single variables from SummarisedBirds object. Here we want the total 
+# number of years, nYears, for each cell, with information broken down by
+# month.
+EB <- exportBirds(SB,
+                  dimension = "Spatial",
+                  timeRes = "Month",
+                  variable = "nYears", # nObs, nVis, nSpp, nDays, AvgSll options
+                  method = "sum")      # sum, medain, mean options
+
+palBW <- leaflet::colorNumeric("Blues", 
+                               c(0, max(EB@data, na.rm = TRUE)))
+
 oldpar <- par(no.readonly =TRUE)
 par(mfrow=c(1,3), mar=c(1,1,1,1))
 plot(SB$spatial[wNonEmpty,], col="grey", border = NA)
@@ -218,17 +295,18 @@ mtext("Visited cells", 3, line=-1)
 
 plot(EB, col=palBW(EB@data$Jul), border = NA)
 plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
-mtext("Number of years for which \nJuly was sampled", 3, line=-2)
+mtext("No. years for which \nJuly sampled", 3, line=-2)
 
 plot(EB, col=palBW(EB@data$Dec), border = NA)
 plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
-mtext("Number of years for which \nDecember was sampled", 3, line=-2)
+mtext("No. years for which \nDecember sampled", 3, line=-2)
 legend("bottomleft", 
        legend=seq(0, max(EB@data, na.rm = TRUE), length.out = 5),
        col = palBW(seq(0, max(EB@data, na.rm = TRUE), length.out = 5)),
        title = "Number of years", pch = 15, bty="n")
 par(oldpar)
 ```
+
 
 
 ```{r}
