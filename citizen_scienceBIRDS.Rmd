@@ -30,6 +30,16 @@ This practical aims to provide an overview of some of the basic functionality of
 * Szabo J.K. _et al_ (2010) Regional avian species declines estimated from volunteer-collected long-term data using List Length Analysis. Ecological Applications <https://doi.org/10.1890/09-0877.1>
 * Tefler M.G. _et al_ (2002) A general method for measuring relative change in range size from biological atlas data. Biological Conservation <https://doi.org/10.1016/S0006-3207(02)00050-2>
 
+# Advantages and disadventages of BIRDS
+The BIRDS package won a prize in 2019 for best use of Citizen Science data from the Global Biodiversity Information Facility (GBIF). It is being actively developed, and I expect to see continued improvments in the software. Unfortunately the documentation and online tutorials are still incomplete or minimal in many places, and some function names have slightly inconsistent syntax. It creates spatial data, but currently uses the older `sp` R spatial library, not the newer `sf` library, although it is in the process of being updated to become compatible with the latter.
+
+## BIRDS workflow
+The following diagram gives a summary of a possible workflow with BIRDS.
+
+![](images/BIRDS_workflow.png)
+
+In other words, it provides a means of going from the original data held on the Citizen Science database, through to creating various reports to identify patterns in space and time in the records, gaps in knowledge etc.
+
 # Getting started with BIRDS
 Begin by installing and loading the BIRDS package in the usual way with `install.packages("BIRDS")`. Note that it will auto-install various other packages at the same time. Please load the BIRDS library, as well as several other useful ones, such as `NBN4R` to get the data, the `sp` and `sf` packages for handling spatial information, and the `lubridate` package for handling dates and times.
 
@@ -60,6 +70,10 @@ The SLL per visit (i.e. the number of species observed and recorded per visit) i
 
 # Example: sundews _Drosera_ in Scotland
 As our example to demonstrate how to use BIRDS, we will look at Citizen Science data on fly-catches or sundews, in Scotland. Sundews belong to the genus _Drosera_ and there are several different species in the UK. They tend to occur in upland bogs, where the soil is poor in nitrogen and other key nutrients, and the plants have evolved sticky hairs on their leaves with which to catch insects, and in thus increase their supply of nutrients.
+
+![](images/Drosera_anglica.jpg)
+
+We'll begin by downloading data from the National Biodiversity Network Atlas on _Drosera_ records:
 
 ```{r, eval=FALSE}
 nbn_config(caching="off")
