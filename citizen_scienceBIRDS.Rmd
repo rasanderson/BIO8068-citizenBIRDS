@@ -310,19 +310,24 @@ par(oldpar)
 # Create maps of "ignorance scores"
 The concept of ignorance scores was developed by Ruete (2015). Ignorance scores are a proxy for the lack of sampling effort, computed by making the number of observations relative to a reference number of observations that is considered to be enough to reduce the ignorance score by half (the half-ignorance approach). The `exposeIgnorance()` function can be used to determine these values based on the either the number of observations or visits. The algorithm behind the Ignorance Score is designed to identify biases and gaps in primary biodiversity data across taxonomy, time and space, which is especially useful for Citizen Science data that may have been collected in an unstructured manner.
 
-It is useful to display both the number of observations, and the ignorance score, which here we calculate using the visitations. First, the number of observations in each grid cell:
+It is useful to display both the number of observations, and the ignorance score, which here we calculate using the visitations. First, create the colour pallete based on the number of visits:
 
 ```{r, eval=FALSE}
 # Create a nice colour-pallete. The upper boundary is set to maximum of `nVis`
 # palBW is an R function to generate sequence of colours within limits
-palBW <- leaflet::colorNumeric("Blues", 
+palBW <- leaflet::colorNumeric(pallete = "Blues", 
                                domain = c(0, max(SB$spatial@data$nVis, na.rm = TRUE)))
-# Create sequence numbers from to 0 to max vists; 5 number groups
-seqNVis<-round(seq(0, max(SB$spatial@data$nVis, na.rm = TRUE), length.out = 5))
+# Create sequence numbers from to 0 to max visits; 5 number groups, for legend
+seqNVis <- round(seq(0, max(SB$spatial@data$nVis, na.rm = TRUE), length.out = 5))
+```
 
-# Plot grid and Scottish outline
-plot(SB$spatial, col=palBW(SB$spatial@data$nVis), border = NA)
-plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
+Now create the visitation map, using this colour pallete for legend
+
+```{r, eval=FALSE}
+# Grey background map
+plot(scot_ll_sp, col="grey90", border = "grey90", lwd=1)
+# Add visits
+plot(SB$spatial, col=palBW(SB$spatial@data$nVis), border = NA, add=TRUE)
 
 # Add legend
 legend("bottomleft",
@@ -351,11 +356,13 @@ Now use this information to create a map of Scotland with ignorance values
 ```{r, eval=FALSE}
 # Grey background map
 plot(scot_ll_sp, col="grey90", border = "grey90", lwd=1)
-
+# Ignorance map
 plot(SB$spatial, col=palBWR(ign), border = NA, add=TRUE)
+
+# Add legend
 legend("bottomleft",
-       legend=c(seqIgn, "NA"),
-       col = c(colIgn, "grey90"),
+       legend=c(seqIgn, "NA"),       # Add an extra category for NA values
+       col = c(colIgn, "grey90"),    # Colour NA values grey
        title = "Ignorance on nVis; \nh 0.5 = 5",
        pch = 15,
        bty="n")
