@@ -307,12 +307,67 @@ legend("bottomleft",
 par(oldpar)
 ```
 
+# Create maps of "ignorance scores"
+The concept of ignorance scores was developed by Ruete (2015). Ignorance scores are a proxy for the lack of sampling effort, computed by making the number of observations relative to a reference number of observations that is considered to be enough to reduce the ignorance score by half (the half-ignorance approach). The `exposeIgnorance()` function can be used to determine these values based on the either the number of observations or visits. The algorithm behind the Ignorance Score is designed to identify biases and gaps in primary biodiversity data across taxonomy, time and space, which is especially useful for Citizen Science data that may have been collected in an unstructured manner.
+
+It is useful to display both the number of observations, and the ignorance score, which here we calculate using the visitations. First, the number of observations in each grid cell:
+
+```{r, eval=FALSE}
+# Create a nice colour-pallete. The upper boundary is set to maximum of `nVis`
+# palBW is an R function to generate sequence of colours within limits
+palBW <- leaflet::colorNumeric("Blues", 
+                               domain = c(0, max(SB$spatial@data$nVis, na.rm = TRUE)))
+# Create sequence numbers from to 0 to max vists; 5 number groups
+seqNVis<-round(seq(0, max(SB$spatial@data$nVis, na.rm = TRUE), length.out = 5))
+
+# Plot grid and Scottish outline
+plot(SB$spatial, col=palBW(SB$spatial@data$nVis), border = NA)
+plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
+
+# Add legend
+legend("bottomleft",
+       legend = seqNVis,                    # Numbers used in legend              
+       col = palBW(seqNVis),                # Colours used in legend
+       title = "Number of \nobservations",  # Legend caption
+       pch = 15,                            # Shape of colour; 15 is square
+       bty="n")                             # Omit background box
+```
+
+You can see the observations quite widely scattered across Scotland, mainly central Highland region. Few observations in some of the Outer Hebrides, Orkney or Shetland Isles. Now, compare with potential ignorance using the `exposeIgnorance()` function. Here we set the half-ignorance parameter value to 5. There is sometimes a bit of trial-and-error to setting this value so as to create a map where areas of relatively high ignorance are easy to spot.
+
+```{r, eval=FALSE}
+# Extract ignorance scores. h = 5 is the half-ignorance parameter value
+ign <- exposeIgnorance(SB$spatial@data$nVis, h = 5)
+
+# Create a colour pallete function, sequence, and colour codes
+palBWR <- leaflet::colorNumeric(pallete = c("green", "white","red"), 
+                                domain = c(0, 1))
+seqIgn <- seq(0, 1, length.out = 5)  # numbers 0.00, 0.25, 0.50, 0.75, 1.00
+colIgn <- palBWR(seqIgn)             # convert to R colour codes
+```
+
+Now use this information to create a map of Scotland with ignorance values
+
+```{r, eval=FALSE}
+# Grey background map
+plot(scot_ll_sp, col="grey90", border = "grey90", lwd=1)
+
+plot(SB$spatial, col=palBWR(ign), border = NA, add=TRUE)
+legend("bottomleft",
+       legend=c(seqIgn, "NA"),
+       col = c(colIgn, "grey90"),
+       title = "Ignorance on nVis; \nh 0.5 = 5",
+       pch = 15,
+       bty="n")
+```
 
 
-```{r}
+
+```{r, echo=FALSE}
+# Use this code to print side-by-side
 oldpar <- par(no.readonly =TRUE)
 par(mfrow=c(1,2), mar=c(1,1,1,1))
-palBW <- leaflet::colorNumeric(c("white", "navyblue"), 
+palBW <- leaflet::colorNumeric(c("navyblue", "white","red"), 
                                c(0, max(SB$spatial@data$nVis, na.rm = TRUE)), 
                                na.color = "transparent")
 seqNVis<-round(seq(0, max(SB$spatial@data$nVis, na.rm = TRUE), length.out = 5))
@@ -322,16 +377,16 @@ legend("bottomleft", legend=seqNVis, col = palBW(seqNVis),
       title = "Number of \nobservations", pch = 15, bty="n")
 
 ign<-exposeIgnorance(SB$spatial@data$nVis, h = 5)
-palBWR <- leaflet::colorNumeric(c("navyblue", "white","red"), c(0, 1), 
+palBWR <- leaflet::colorNumeric(c("green", "white", "red"), c(0, 1), 
                                 na.color = "transparent")
 plot(scot_ll_sp, col="grey90", border = "grey90", lwd=1)
 #> Warning in wkt(obj): CRS object has no comment
 plot(SB$spatial, col=palBWR(ign), border = NA, add=TRUE)
-plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
+#plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
 legend("bottomleft", legend=c(seq(0, 1, length.out = 5), "NA"),
       col = c(palBWR(seq(0, 1, length.out = 5)), "grey90"),
-      title = "Ignorance \nnVis, \nO0.5=5", pch = 15, bty="n")
+      title = "Ignorance \nnVis, \n0.5=5", pch = 15, bty="n")
 par(oldpar)
 ```
 
-
+You can see that the main areas with high ignorance are north-east Scotland in Aberdeenshire, and possibly south-east Scotland. Even though the outer Hebrides, Orkney and Shetland have relatively few observations, the data do seem fairly reliable from there. In contrast, we cannot be sure that the lack of records from Aberdeenshire represents a real absence of the _Drosera_. It may reflect sampling bias in the underlying Citizen Science data.
