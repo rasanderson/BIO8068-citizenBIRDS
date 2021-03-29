@@ -223,8 +223,11 @@ Next, let's create some maps across Scotland to show which grid cells were visit
 # Identify gridcells which have no records. A bit complicated a the SB
 # object is an R "list" structure.
 wNonEmpty<-unname( which( unlist(lapply(SB$overlaid, nrow)) != 0) )
-plot(SB$spatial[wNonEmpty,], col="grey", border = NA)
-plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
+
+# Plot Scotland in light grey
+plot(scot_ll_sp, col="grey90", border = "grey90", lwd=1)
+# Plot records in darker gray
+plot(SB$spatial[wNonEmpty,], col="grey", border = NA, add=TRUE)
 ```
 
 You can see that most of Scotland has been surveyed according to the dataset. Now let us extract the information on a monthly basis for the total number of years (sum) of visits to each cell.
@@ -240,30 +243,49 @@ EB <- exportBirds(SB,
                   method = "sum")      # sum, medain, mean options
 ```
 
+We'll use the `colorNumeric()` function to create some attractive colours. This takes the name of a pallete, as either a range of named colours, or a single colour name; here we will do shades of blue. It also needs to know the `domain` to work in, i.e. the minimum to maximum numeric values it will work with. The `colorNumeric()` function actually generates another function, which here we are calling `palBW()`. If you give this function a number, it will return a cryptic R colour code.
+
+```{r}
+# Create a nice looking colour palette from white to navy blue
+palBW <- leaflet::colorNumeric(palette = "Blues",
+                               domain = c(0, max(EB@data, na.rm = TRUE)) )
+# Create a sequence of 5 numbers from 0 to max number of years
+yrCnts <- seq(0, max(EB@data, na.rm = TRUE), length.out = 5)
+```
+
+Here, the `yrCnts` gives the values from 0 to 22, which is the maximum number of years. If you display both you will see how `palBW()` "translates" these into colour codes that you can use in a legend:
+
+```{r}
+yrCnts
+palBW(yrCnts)
+```
+
+The cryptic codes with `#` symbols are the colour codes used internally by R. Now go ahead to plot your two maps side-by-side:
 
 ```{r, eval=FALSE}
-# Create a nice looking colour pallete from white to navy blue
-palBW <- leaflet::colorNumeric("Blues",
-                               domain = c(0, max(EB@data, na.rm = TRUE)) ) 
-
 # Set plot window to 1 row and 2 columns
 par(mfrow=c(1,2))
 
-# Plot July data
-plot(EB, col=palBW(EB@data$Jul), border = NA)
-plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
+# July data
+# Plot Scotland background
+plot(scot_ll_sp, col="grey90", border = "grey90", lwd=1)
+# Plot July visits. Give the col option the palBW function with July data
+plot(EB, col=palBW(EB@data$Jul), border = NA, add=TRUE)
+# Map caption
 mtext("Number of years for which \nJuly was sampled", 3, line=-2)
 
-# Plot December data
-plot(EB, col=palBW(EB@data$Dec), border = NA)
-plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
+# Plot December data in the same way
+plot(scot_ll_sp, col="grey90", border = "grey90", lwd=1)
+plot(EB, col=palBW(EB@data$Dec), border = NA, add=TRUE)
 mtext("Number of years for which \nDecember was sampled", 3, line=-2)
 
 # Add legend showing number of years
-legend("bottomleft", 
-       legend=seq(0, max(EB@data, na.rm = TRUE), length.out = 5),
-       col = palBW(seq(0, max(EB@data, na.rm = TRUE), length.out = 5)),
-       title = "Number of years", pch = 15, bty="n")
+legend("bottomleft",                 # Position of legend (in last plot)
+       legend= yrCnts,               # Numbers to use in legend
+       col = palBW(yrCnts),          # Colours for legend
+       title = "Number of years",    # Legend title
+       pch = 15,                     # Shape of colour symbols; 15=square
+       bty="n")                      # Do not draw box round legend
 
 # Reset plot window
 par(mfrow=c(1,1))
@@ -289,23 +311,26 @@ palBW <- leaflet::colorNumeric("Blues",
 
 oldpar <- par(no.readonly =TRUE)
 par(mfrow=c(1,3), mar=c(1,1,1,1))
-plot(SB$spatial[wNonEmpty,], col="grey", border = NA)
-plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
+plot(scot_ll_sp, col="grey90", border = "grey90", lwd=1)
+plot(SB$spatial[wNonEmpty,], col="grey", border = NA, add=TRUE)
 mtext("Visited cells", 3, line=-1)
 
-plot(EB, col=palBW(EB@data$Jul), border = NA)
-plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
+plot(scot_ll_sp, col="grey90", border = "grey90", lwd=1)
+plot(EB, col=palBW(EB@data$Jul), border = NA, add=TRUE)
 mtext("No. years for which \nJuly sampled", 3, line=-2)
 
-plot(EB, col=palBW(EB@data$Dec), border = NA)
-plot(scot_ll_sp, col=NA, border = "grey", lwd=1, add=TRUE)
+plot(scot_ll_sp, col="grey90", border = "grey90", lwd=1)
+plot(EB, col=palBW(EB@data$Dec), border = NA, add=TRUE)
 mtext("No. years for which \nDecember sampled", 3, line=-2)
+
 legend("bottomleft", 
        legend=seq(0, max(EB@data, na.rm = TRUE), length.out = 5),
        col = palBW(seq(0, max(EB@data, na.rm = TRUE), length.out = 5)),
        title = "Number of years", pch = 15, bty="n")
 par(oldpar)
 ```
+
+As you might expect, lots of samples in July, virtually none in December. Of course if you were looking at records of a migratory bird that over-winters in the UK, the results would be reversed!
 
 # Create maps of "ignorance scores"
 The concept of ignorance scores was developed by Ruete (2015). Ignorance scores are a proxy for the lack of sampling effort, computed by making the number of observations relative to a reference number of observations that is considered to be enough to reduce the ignorance score by half (the half-ignorance approach). The `exposeIgnorance()` function can be used to determine these values based on the either the number of observations or visits. The algorithm behind the Ignorance Score is designed to identify biases and gaps in primary biodiversity data across taxonomy, time and space, which is especially useful for Citizen Science data that may have been collected in an unstructured manner.
