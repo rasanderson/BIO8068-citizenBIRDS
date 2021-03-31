@@ -2,9 +2,9 @@
 title: "Biodiversity Information Review & Decision Support with Citizen Science data"
 subtitle: "BIO8068 Data visualisation in Ecology"
 output:
+  html_document: default
   word_document:
     reference_docx: word_template.docx
-  html_document: default
   pdf_document: default
 ---
 
