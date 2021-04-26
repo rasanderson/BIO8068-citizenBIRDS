@@ -2,9 +2,9 @@
 title: "Biodiversity Information Review & Decision Support with Citizen Science data"
 subtitle: "BIO8068 Data visualisation in Ecology"
 output:
-  html_document: default
   word_document:
     reference_docx: word_template.docx
+  html_document: default
   pdf_document: default
 ---
 
@@ -257,7 +257,7 @@ EB <- exportBirds(SB,
                   method = "sum")      # sum, medain, mean options
 ```
 
-We'll use the `colorNumeric()` function to create some attractive colours. This takes the name of a pallete, as either a range of named colours, or a single colour name; here we will do shades of blue. It also needs to know the `domain` to work in, i.e. the minimum to maximum numeric values it will work with. The `colorNumeric()` function actually generates another function, which here we are calling `palBW()`. If you give this function a number, it will return a cryptic R colour code.
+We'll use the `colorNumeric()` function to create some attractive colours. This takes the name of a palette, as either a range of named colours, or a single colour name; here we will do shades of blue. It also needs to know the `domain` to work in, i.e. the minimum to maximum numeric values it will work with. The `colorNumeric()` function actually generates another function, which here we are calling `palBW()`. If you give this function a number, it will return a cryptic R colour code.
 
 ```{r}
 # Create a nice looking colour palette from white to navy blue
@@ -349,18 +349,18 @@ As you might expect, lots of samples in July, virtually none in December. Of cou
 # Create maps of "ignorance scores"
 The concept of ignorance scores was developed by Ruete (2015). Ignorance scores are a proxy for the lack of sampling effort, computed by making the number of observations relative to a reference number of observations that is considered to be enough to reduce the ignorance score by half (the half-ignorance approach). The `exposeIgnorance()` function can be used to determine these values based on the either the number of observations or visits. The algorithm behind the Ignorance Score is designed to identify biases and gaps in primary biodiversity data across taxonomy, time and space, which is especially useful for Citizen Science data that may have been collected in an unstructured manner.
 
-It is useful to display both the number of observations, and the ignorance score, which here we calculate using the visitations. First, create the colour pallete based on the number of visits:
+It is useful to display both the number of observations, and the ignorance score, which here we calculate using the visitations. First, create the colour palette based on the number of visits:
 
 ```{r, eval=FALSE}
-# Create a nice colour-pallete. The upper boundary is set to maximum of `nVis`
+# Create a nice colour-palette. The upper boundary is set to maximum of `nVis`
 # palBW is an R function to generate sequence of colours within limits
-palBW <- leaflet::colorNumeric(pallete = "Blues", 
+palBW <- leaflet::colorNumeric(palette = "Blues", 
                                domain = c(0, max(SB$spatial@data$nVis, na.rm = TRUE)))
 # Create sequence numbers from to 0 to max visits; 5 number groups, for legend
 seqNVis <- round(seq(0, max(SB$spatial@data$nVis, na.rm = TRUE), length.out = 5))
 ```
 
-Now create the visitation map, using this colour pallete for legend
+Now create the visitation map, using this colour palette for legend
 
 ```{r, eval=FALSE}
 # Grey background map
@@ -383,8 +383,8 @@ You can see the observations quite widely scattered across Scotland, mainly cent
 # Extract ignorance scores. h = 5 is the half-ignorance parameter value
 ign <- exposeIgnorance(SB$spatial@data$nVis, h = 5)
 
-# Create a colour pallete function, sequence, and colour codes
-palBWR <- leaflet::colorNumeric(pallete = c("green", "white","red"), 
+# Create a colour palette function, sequence, and colour codes
+palBWR <- leaflet::colorNumeric(palette = c("green", "white","red"), 
                                 domain = c(0, 1))
 seqIgn <- seq(0, 1, length.out = 5)  # numbers 0.00, 0.25, 0.50, 0.75, 1.00
 colIgn <- palBWR(seqIgn)             # convert to R colour codes
